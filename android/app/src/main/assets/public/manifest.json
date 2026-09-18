@@ -1,0 +1,25 @@
+{
+  "short_name": "MiniRush",
+  "name": "MiniRush — Tiny Games. Endless Challenges.",
+  "id": "com.minirush.arcade",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#020617",
+  "theme_color": "#4F46E5",
+  "description": "Tiny Games. Endless Challenges. A high-energy mobile mini-game arcade with instant play, friend challenges, leaderboards, and rewards.",
+  "categories": ["games", "arcade", "casual"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "64x64",
+      "type": "image/svg+xml"
+    }
+  ]
+}

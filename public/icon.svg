@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0F172A" />
+      <stop offset="50%" stop-color="#1E1B4B" />
+      <stop offset="100%" stop-color="#020617" />
+    </linearGradient>
+
+    <linearGradient id="badgeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4F46E5" />
+      <stop offset="45%" stop-color="#7C3AED" />
+      <stop offset="100%" stop-color="#EC4899" />
+    </linearGradient>
+
+    <linearGradient id="boltGrad" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#FDE047" />
+      <stop offset="50%" stop-color="#F59E0B" />
+      <stop offset="100%" stop-color="#EF4444" />
+    </linearGradient>
+
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#818CF8" stop-opacity="0.45" />
+      <stop offset="100%" stop-color="#4F46E5" stop-opacity="0" />
+    </radialGradient>
+
+    <filter id="dropShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="16" stdDeviation="16" flood-color="#000000" flood-opacity="0.6" />
+    </filter>
+
+    <filter id="boltGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#F59E0B" flood-opacity="0.8" />
+    </filter>
+  </defs>
+
+  <!-- Background Base Container -->
+  <rect width="512" height="512" rx="120" fill="url(#bgGrad)" />
+
+  <!-- Ambient Energy Radial Glow -->
+  <circle cx="256" cy="256" r="210" fill="url(#glow)" />
+
+  <!-- Subtle Rim Border -->
+  <rect x="8" y="8" width="496" height="496" rx="112" fill="none" stroke="#6366F1" stroke-width="4" stroke-opacity="0.3" />
+
+  <!-- Arcade Hex Gem Emblem -->
+  <g filter="url(#dropShadow)">
+    <polygon points="144,170 256,104 368,170 368,342 256,408 144,342" fill="url(#badgeGrad)" />
+    <!-- Inner faceted stroke -->
+    <polygon points="160,180 256,122 352,180 352,332 256,390 160,332" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-opacity="0.4" />
+  </g>
+
+  <!-- Dynamic Rush Lightning Bolt -->
+  <g filter="url(#boltGlow)">
+    <!-- Golden Orange Outer Bolt Silhouette -->
+    <polygon points="278,130 182,246 244,246 210,382 334,226 266,226" fill="url(#boltGrad)" />
+    <!-- Pure White High-Contrast Core -->
+    <polygon points="274,142 196,238 248,238 220,362 318,232 262,232" fill="#FFFFFF" />
+  </g>
+
+  <!-- Arcade Speed Sparks -->
+  <circle cx="330" cy="150" r="10" fill="#FDE047" />
+  <circle cx="170" cy="310" r="8" fill="#FDE047" />
+</svg>

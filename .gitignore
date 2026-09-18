@@ -6,3 +6,14 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Android build & local artifacts
+local.properties
+.gradle/
+
+# Keystores, certificates & private keys
+*.jks
+*.keystore
+*.p12
+*.key
+*.pem

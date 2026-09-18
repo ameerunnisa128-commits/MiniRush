@@ -18,10 +18,12 @@ import { FriendChallengeModal } from './components/FriendChallengeModal';
 import { ShareModal } from './components/ShareModal';
 import { AdModal } from './components/AdModal';
 import { SettingsModal } from './components/SettingsModal';
+import { SplashScreen } from './components/SplashScreen';
 
 import { Heart, Coins, Settings, Gamepad2, Swords, Trophy, User, Plus } from 'lucide-react';
 
 export default function App() {
+  const [showSplash, setShowSplash] = useState(true);
   const [activeTab, setActiveTab] = useState<'home' | 'arena' | 'leaderboard' | 'profile'>('home');
   const [profile, setProfile] = useState<UserProfile>(() => StorageService.loadProfile());
   const [settings, setSettings] = useState<AppSettings>(() => StorageService.loadSettings());
@@ -349,6 +351,11 @@ export default function App() {
             onSettingsUpdate={setSettings}
             onProfileUpdate={setProfile}
           />
+        )}
+
+        {/* Brand Splash Screen on Boot */}
+        {showSplash && (
+          <SplashScreen onComplete={() => setShowSplash(false)} />
         )}
       </div>
     </div>
