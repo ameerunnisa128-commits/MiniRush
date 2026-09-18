@@ -1,0 +1,6 @@
+{
+  "name": "MiniRush",
+  "description": "Tiny Games. Endless Challenges. A high-energy mobile mini-game arcade with instant play, friend challenges, leaderboards, and rewards.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
