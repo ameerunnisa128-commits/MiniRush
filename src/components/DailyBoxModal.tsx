@@ -49,8 +49,8 @@ export const DailyBoxModal: React.FC<DailyBoxModalProps> = ({
       // ignore
     }
 
-    const updated = { ...profile };
-    updated.coins += rewardToday.coins;
+    const tx = StorageService.transactCoins('EARN', rewardToday.coins, `Daily Box Day ${currentStreak}`, profile);
+    const updated = { ...tx.profile };
     updated.lives = Math.min(updated.maxLives, updated.lives + rewardToday.lives);
     updated.lastDailyBoxClaim = Date.now();
     updated.streakDays += 1;
@@ -61,6 +61,9 @@ export const DailyBoxModal: React.FC<DailyBoxModalProps> = ({
     setClaimedReward({ coins: rewardToday.coins, lives: rewardToday.lives });
     setIsOpened(true);
   };
+
+  const alreadyDoubledToday = profile.lastDailyBoxDoubled && 
+    new Date(profile.lastDailyBoxDoubled).toDateString() === new Date().toDateString();
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-4">
@@ -147,6 +150,10 @@ export const DailyBoxModal: React.FC<DailyBoxModalProps> = ({
               <Gift className="w-5 h-5" />
               CLAIM DAY {currentStreak} BOX 🚀
             </button>
+          ) : alreadyDoubledToday ? (
+            <div className="w-full py-3 rounded-2xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 font-black text-xs text-center">
+              DOUBLE REWARD CLAIMED TODAY ✓ (+{rewardToday.coins} 🪙)
+            </div>
           ) : (
             <button
               onClick={() => {

@@ -99,6 +99,17 @@ export interface Achievement {
   claimed: boolean;
 }
 
+export type CoinTransactionType = 'EARN' | 'SPEND' | 'BONUS' | 'REFUND';
+
+export interface CoinTransaction {
+  id: string;
+  type: CoinTransactionType;
+  amount: number;
+  reason: string;
+  timestamp: number;
+  balanceAfter: number;
+}
+
 export interface UserProfile {
   id: string;
   username: string;
@@ -111,8 +122,10 @@ export interface UserProfile {
   nextLifeRefillTime: number; // timestamp
   streakDays: number;
   lastDailyBoxClaim: number; // timestamp
+  lastDailyBoxDoubled?: number; // timestamp
   referralCode: string;
   referralsClaimed: number;
+  redeemedReferralCodes?: string[];
   totalGamesPlayed: number;
   totalWins: number;
   perfectShots: number;
@@ -120,6 +133,7 @@ export interface UserProfile {
   highScores: Record<string, number>;
   unlockedAvatars: string[];
   achievements: Achievement[];
+  coinTransactions?: CoinTransaction[];
 }
 
 export interface AppSettings {

@@ -112,9 +112,10 @@ export default function App() {
   // Watch ad for double daily box coins
   const handleWatchAdToDoubleDaily = (bonusCoins: number) => {
     handleRequestAd('double_daily_box', () => {
-      const updated = { ...profile, coins: profile.coins + bonusCoins };
-      StorageService.saveProfile(updated);
-      setProfile(updated);
+      const tx = StorageService.transactCoins('BONUS', bonusCoins, 'Daily Box 2x Reward Ad', profile);
+      tx.profile.lastDailyBoxDoubled = Date.now();
+      StorageService.saveProfile(tx.profile);
+      setProfile(tx.profile);
     });
   };
 

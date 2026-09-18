@@ -1,4 +1,4 @@
-import { UserProfile, AppSettings, FriendChallenge, GameSessionResult, Achievement, LeaderboardEntry } from '../types';
+import { UserProfile, AppSettings, FriendChallenge, GameSessionResult, Achievement, LeaderboardEntry, CoinTransaction, CoinTransactionType } from '../types';
 import { DEFAULT_ACHIEVEMENTS, BOT_OPPONENTS, ALL_GAMES } from '../data/games';
 
 const USER_KEY = 'minirush_user_profile_v1';
@@ -214,14 +214,16 @@ export class StorageService {
     }
 
     profile.totalGamesPlayed += 1;
-    profile.coins += result.coinsEarned;
+    if (result.coinsEarned > 0) {
+      this.transactCoins('EARN', result.coinsEarned, `Match Score: ${saneScore} (${result.gameId})`, profile);
+    }
     profile.xp += result.xpEarned;
 
     // Check level progression (every 500 XP = 1 Level)
     const newLevel = Math.floor(profile.xp / 500) + 1;
     if (newLevel > profile.level) {
       profile.level = newLevel;
-      profile.coins += 100; // Level-up bonus!
+      this.transactCoins('BONUS', 100, `Level Up to Level ${newLevel}!`, profile);
     }
 
     // Check achievements
@@ -275,6 +277,102 @@ export class StorageService {
     profile.nextLifeRefillTime = profile.lives >= profile.maxLives ? 0 : profile.nextLifeRefillTime;
     this.saveProfile(profile);
     return profile;
+  }
+
+  // Universal Coin Transaction Engine
+  public static transactCoins(
+    type: CoinTransactionType,
+    amount: number,
+    reason: string,
+    existingProfile?: UserProfile
+  ): { success: boolean; profile: UserProfile; transaction?: CoinTransaction; error?: string } {
+    const profile = existingProfile || this.loadProfile();
+    const cleanAmount = Math.floor(amount);
+
+    if (cleanAmount <= 0 || !Number.isFinite(cleanAmount)) {
+      return { success: false, profile, error: 'Transaction amount must be a positive integer.' };
+    }
+
+    if (type === 'SPEND') {
+      if (profile.coins < cleanAmount) {
+        return { 
+          success: false, 
+          profile, 
+          error: `Insufficient coins: balance is ${profile.coins}, requires ${cleanAmount}.` 
+        };
+      }
+      profile.coins = Math.max(0, profile.coins - cleanAmount);
+    } else {
+      // EARN, BONUS, REFUND
+      profile.coins += cleanAmount;
+    }
+
+    const transaction: CoinTransaction = {
+      id: `tx_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      type,
+      amount: cleanAmount,
+      reason,
+      timestamp: Date.now(),
+      balanceAfter: profile.coins,
+    };
+
+    profile.coinTransactions = [transaction, ...(profile.coinTransactions || [])].slice(0, 50);
+
+    this.saveProfile(profile);
+    return { success: true, profile, transaction };
+  }
+
+  // Purchase full life refill using coins (200 coins)
+  public static buyLivesWithCoins(cost: number = 200): { success: boolean; profile: UserProfile; error?: string } {
+    const profile = this.loadProfile();
+    if (profile.lives >= profile.maxLives) {
+      return { success: false, profile, error: 'Lives are already full.' };
+    }
+    const res = this.transactCoins('SPEND', cost, 'Refilled 5 Lives with Coins', profile);
+    if (!res.success) {
+      return { success: false, profile, error: res.error };
+    }
+    res.profile.lives = res.profile.maxLives;
+    res.profile.nextLifeRefillTime = 0;
+    this.saveProfile(res.profile);
+    return { success: true, profile: res.profile };
+  }
+
+  // Redeem a referral code with anti-abuse validation
+  public static redeemReferralCode(code: string): { success: boolean; profile: UserProfile; error?: string } {
+    const profile = this.loadProfile();
+    const cleanCode = code.trim().toUpperCase();
+
+    if (!cleanCode) {
+      return { success: false, profile, error: 'Please enter a referral code.' };
+    }
+
+    if (cleanCode === profile.referralCode.toUpperCase()) {
+      return { success: false, profile, error: 'You cannot redeem your own referral code.' };
+    }
+
+    if (profile.redeemedReferralCodes && profile.redeemedReferralCodes.includes(cleanCode)) {
+      return { success: false, profile, error: 'You have already redeemed this referral code.' };
+    }
+
+    if ((profile.redeemedReferralCodes?.length || 0) >= 1) {
+      return { success: false, profile, error: 'Referral reward already claimed for this device.' };
+    }
+
+    if (!cleanCode.startsWith('RUSH-') || cleanCode.length < 8) {
+      return { success: false, profile, error: 'Invalid code format. Format is RUSH-XXXX.' };
+    }
+
+    const tx = this.transactCoins('BONUS', 500, `Redeemed Referral Code (${cleanCode})`, profile);
+    if (!tx.success) {
+      return { success: false, profile, error: tx.error };
+    }
+
+    tx.profile.redeemedReferralCodes = [...(tx.profile.redeemedReferralCodes || []), cleanCode];
+    tx.profile.referralsClaimed = (tx.profile.referralsClaimed || 0) + 1;
+    this.saveProfile(tx.profile);
+
+    return { success: true, profile: tx.profile };
   }
 
   // Check if daily box is ready

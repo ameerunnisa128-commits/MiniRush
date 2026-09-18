@@ -210,6 +210,23 @@ export const ActiveGameModal: React.FC<ActiveGameModalProps> = ({
               >
                 WATCH AD FOR +5 LIVES ❤️
               </button>
+
+              <button
+                onClick={() => {
+                  const res = StorageService.buyLivesWithCoins(200);
+                  if (res.success) {
+                    onProfileUpdate(res.profile);
+                    setOutOfLives(false);
+                    handleRetry();
+                  } else {
+                    alert(res.error || 'Not enough coins');
+                  }
+                }}
+                disabled={profile.coins < 200}
+                className="mt-2.5 w-full py-3.5 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-300 font-black text-xs active:scale-95 disabled:opacity-40 flex items-center justify-center gap-2"
+              >
+                REFILL WITH 200 COINS 🪙 (Balance: {profile.coins.toLocaleString()})
+              </button>
               <button
                 onClick={onClose}
                 className="mt-3 text-xs text-slate-400 hover:text-slate-200 py-2"

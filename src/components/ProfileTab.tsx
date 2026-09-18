@@ -23,15 +23,47 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ profile, onProfileUpdate
   const [copied, setCopied] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [usernameInput, setUsernameInput] = useState(profile.username);
+  const [redeemInput, setRedeemInput] = useState('');
+  const [redeemMsg, setRedeemMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const totalScore = Object.values(profile.highScores).reduce((a, b) => a + b, 0);
   const currentAvatar = AVATARS.find(a => a.id === profile.avatarId) || AVATARS[0];
 
   const handleAvatarSelect = (avatarId: string) => {
     sound.playClick();
+    const unlocked = profile.unlockedAvatars || ['rushy', 'fox', 'cyber'];
+    if (!unlocked.includes(avatarId)) {
+      // Purchase avatar for 250 coins
+      const tx = StorageService.transactCoins('SPEND', 250, `Unlocked Avatar: ${avatarId}`, profile);
+      if (!tx.success) {
+        alert(tx.error || 'Not enough coins to unlock this avatar (250 coins required).');
+        return;
+      }
+      sound.playVictory();
+      const updated = {
+        ...tx.profile,
+        avatarId,
+        unlockedAvatars: [...unlocked, avatarId],
+      };
+      StorageService.saveProfile(updated);
+      onProfileUpdate(updated);
+      return;
+    }
+
     const updated = { ...profile, avatarId };
     StorageService.saveProfile(updated);
     onProfileUpdate(updated);
+  };
+
+  const handleBuyLifeRefill = () => {
+    sound.playClick();
+    const res = StorageService.buyLivesWithCoins(200);
+    if (!res.success) {
+      alert(res.error || 'Failed to refill lives.');
+    } else {
+      sound.playVictory();
+      onProfileUpdate(res.profile);
+    }
   };
 
   const handleSaveName = () => {
@@ -53,8 +85,8 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ profile, onProfileUpdate
     const ach = achList.find(a => a.id === achievementId);
     if (!ach || ach.claimed) return;
 
-    const updated: UserProfile = { ...profile };
-    updated.coins += ach.rewardCoins;
+    const tx = StorageService.transactCoins('BONUS', ach.rewardCoins, `Achievement: ${ach.name || ach.title}`, profile);
+    const updated: UserProfile = { ...tx.profile };
     updated.xp += ach.rewardXp || 50;
     updated.achievements = achList.map(a =>
       a.id === achievementId ? { ...a, claimed: true } : a
@@ -69,6 +101,23 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ profile, onProfileUpdate
     navigator.clipboard.writeText(`Play MiniRush with me and get 500 free coins! Use code: ${profile.referralCode} at ${window.location.origin}`);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleRedeemCode = () => {
+    sound.playClick();
+    const res = StorageService.redeemReferralCode(redeemInput);
+    if (!res.success) {
+      setRedeemMsg({ type: 'error', text: res.error || 'Failed to redeem' });
+      sound.playThunk();
+    } else {
+      sound.playVictory();
+      setRedeemMsg({ type: 'success', text: 'Success! +500 Coins added to your balance 🪙' });
+      onProfileUpdate(res.profile);
+      setRedeemInput('');
+      try {
+        confetti({ particleCount: 80, spread: 70 });
+      } catch {}
+    }
   };
 
   return (
@@ -135,21 +184,41 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ profile, onProfileUpdate
 
         {/* Avatar selector carousel */}
         <div className="mt-4 pt-4 border-t border-slate-800/80">
-          <span className="text-[11px] font-bold text-slate-400 block mb-2 uppercase tracking-wider">Choose Avatar</span>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Choose Avatar</span>
+            <button
+              onClick={handleBuyLifeRefill}
+              className="text-[10px] font-bold text-rose-300 hover:text-white bg-rose-950/60 border border-rose-500/40 px-2 py-0.5 rounded-lg active:scale-95 flex items-center gap-1"
+            >
+              Refill Lives (200 🪙)
+            </button>
+          </div>
           <div className="flex items-center gap-2 overflow-x-auto pb-1">
-            {AVATARS.map(av => (
-              <button
-                key={av.id}
-                onClick={() => handleAvatarSelect(av.id)}
-                className={`p-2 rounded-2xl text-2xl border transition-transform active:scale-95 ${
-                  profile.avatarId === av.id
-                    ? 'bg-indigo-600/40 border-indigo-400 shadow-md scale-105'
-                    : 'bg-slate-800/60 border-slate-700/60 opacity-60'
-                }`}
-              >
-                {av.emoji}
-              </button>
-            ))}
+            {AVATARS.map(av => {
+              const unlocked = (profile.unlockedAvatars || ['rushy', 'fox', 'cyber']).includes(av.id);
+              const isSelected = profile.avatarId === av.id;
+              return (
+                <button
+                  key={av.id}
+                  onClick={() => handleAvatarSelect(av.id)}
+                  className={`p-2 rounded-2xl text-2xl border transition-transform active:scale-95 relative ${
+                    isSelected
+                      ? 'bg-indigo-600/40 border-indigo-400 shadow-md scale-105'
+                      : unlocked
+                      ? 'bg-slate-800/60 border-slate-700/60'
+                      : 'bg-slate-900/80 border-slate-800 opacity-70'
+                  }`}
+                  title={unlocked ? av.name : `${av.name} (Unlock for 250 Coins)`}
+                >
+                  {av.emoji}
+                  {!unlocked && (
+                    <span className="absolute -top-1 -right-1 text-[9px] bg-amber-500 text-slate-950 font-black rounded-full px-1">
+                      🔒
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -201,6 +270,35 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ profile, onProfileUpdate
             {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
             {copied ? 'COPIED!' : 'SHARE'}
           </button>
+        </div>
+
+        {/* Redeem friend code */}
+        <div className="mt-4 pt-3 border-t border-amber-500/20">
+          <span className="text-[11px] font-bold text-slate-300 block mb-1.5">Have a friend's code? Enter to claim +500 Coins:</span>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              placeholder="e.g. RUSH-9AB2"
+              value={redeemInput}
+              onChange={(e) => setRedeemInput(e.target.value.toUpperCase())}
+              className="flex-1 px-3 py-1.5 bg-slate-950/90 border border-slate-700 rounded-xl text-white font-mono font-bold text-xs uppercase placeholder:text-slate-600 focus:outline-none focus:border-amber-400"
+            />
+            <button
+              onClick={handleRedeemCode}
+              disabled={!redeemInput.trim()}
+              className="px-3.5 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 active:scale-95 text-slate-950 font-black text-xs disabled:opacity-40"
+            >
+              REDEEM 🪙
+            </button>
+          </div>
+          {redeemMsg && (
+            <p className={`text-[10px] mt-1.5 font-bold ${redeemMsg.type === 'success' ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {redeemMsg.text}
+            </p>
+          )}
+          <span className="text-[9px] text-slate-400 block mt-1.5 italic">
+            Note: 1 redemption limit per player account. Self-referrals prevented.
+          </span>
         </div>
       </div>
 
