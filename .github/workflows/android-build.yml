@@ -23,8 +23,8 @@ jobs:
 
       - name: 3. Install Web & Capacitor Dependencies
         run: |
-          echo "Installing dependencies..."
-          npm install
+          echo "Installing dependencies via npm ci..."
+          npm ci
 
       - name: 4. Build Vite/React Production Application
         run: |
