@@ -1,4 +1,4 @@
-import { UserProfile, AppSettings, FriendChallenge, GameSessionResult, Achievement, LeaderboardEntry, CoinTransaction, CoinTransactionType } from '../types';
+import { UserProfile, AppSettings, FriendChallenge, GameSessionResult, Achievement, LeaderboardEntry, CoinTransaction, CoinTransactionType, DailyStreakReward } from '../types';
 import { DEFAULT_ACHIEVEMENTS, BOT_OPPONENTS, ALL_GAMES } from '../data/games';
 
 const USER_KEY = 'minirush_user_profile_v1';
@@ -29,18 +29,19 @@ export function getDefaultProfile(): UserProfile {
     maxLives: 5,
     nextLifeRefillTime: 0,
     streakDays: 1,
+    longestStreak: 1,
     lastDailyBoxClaim: 0,
     referralCode: generateReferralCode(),
     referralsClaimed: 0,
     totalGamesPlayed: 0,
     totalWins: 0,
     perfectShots: 12,
-    favorites: ['arrow-lock', 'perfect-aim'],
+    favorites: ['arrow-lock', 'perfect-aim', 'drift-king'],
     highScores: {
       'arrow-lock': 1800,
       'knife-throw': 900,
       'perfect-aim': 2400,
-      'perfect-park': 1200,
+      'drift-king': 3600,
       'mini-2048': 1024,
       'dual-shoot': 280,
       'quick-reaction': 8200,
@@ -50,6 +51,9 @@ export function getDefaultProfile(): UserProfile {
     },
     unlockedAvatars: ['rushy', 'blitz', 'pixel'],
     achievements: DEFAULT_ACHIEVEMENTS,
+    longestDrift: 48.5,
+    lastCoinStashClaim: 0,
+    coinReminderEnabled: true,
   };
 }
 
@@ -211,6 +215,14 @@ export class StorageService {
 
     if (isNewHigh) {
       profile.highScores[result.gameId] = saneScore;
+    }
+
+    // Update longest drift if Drift King
+    if (result.gameId === 'drift-king' && (result.perfectHits || 0) > 0) {
+      const driftMeters = result.perfectHits || 0;
+      if (driftMeters > (profile.longestDrift || 0)) {
+        profile.longestDrift = driftMeters;
+      }
     }
 
     profile.totalGamesPlayed += 1;
@@ -375,17 +387,159 @@ export class StorageService {
     return { success: true, profile: tx.profile };
   }
 
+  // --- DAILY LOGIN STREAK REWARDS & PROGRESSION ---
+  public static readonly DAILY_STREAK_REWARDS: DailyStreakReward[] = [
+    { day: 1, coins: 150, lives: 1, perkTitle: 'Starter Spark', badge: '⚡' },
+    { day: 2, coins: 250, lives: 1, perkTitle: 'Flame Ignite', badge: '🔥' },
+    { day: 3, coins: 400, lives: 2, perkTitle: 'Bronze Surge', badge: '🥉' },
+    { day: 4, coins: 600, lives: 2, perkTitle: 'Silver Boost', badge: '🥈' },
+    { day: 5, coins: 850, lives: 3, perkTitle: 'Gold Rush', badge: '🥇' },
+    { day: 6, coins: 1200, lives: 3, perkTitle: 'Platinum Heat', badge: '💎' },
+    { day: 7, coins: 2000, lives: 5, perkTitle: 'Champion Crown', badge: '👑', isMega: true },
+  ];
+
+  public static getDaysDifference(lastClaimTimestamp: number): number {
+    if (!lastClaimTimestamp || lastClaimTimestamp === 0) return 999;
+    const now = new Date();
+    const last = new Date(lastClaimTimestamp);
+    const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const lastMidnight = new Date(last.getFullYear(), last.getMonth(), last.getDate()).getTime();
+    return Math.round((todayMidnight - lastMidnight) / (24 * 60 * 60 * 1000));
+  }
+
+  public static getStreakStatus(profile: UserProfile): {
+    canClaim: boolean;
+    currentStreak: number;
+    displayDayInCycle: number;
+    isBroken: boolean;
+    longestStreak: number;
+    msUntilNextDrop: number;
+    todayReward: DailyStreakReward;
+    streakMultiplier: number;
+  } {
+    const diffDays = this.getDaysDifference(profile.lastDailyBoxClaim);
+    const canClaim = diffDays > 0;
+    const longestStreak = Math.max(profile.longestStreak || 1, profile.streakDays || 1);
+
+    const currentStreak = profile.streakDays || 1;
+    const isBroken = diffDays > 1 && profile.lastDailyBoxClaim > 0;
+
+    let displayDayInCycle: number;
+    if (!canClaim) {
+      // Already claimed today: show current completed day in 1-7 cycle
+      displayDayInCycle = ((currentStreak - 1) % 7) + 1;
+    } else {
+      // Can claim today:
+      if (isBroken || profile.lastDailyBoxClaim === 0) {
+        displayDayInCycle = 1;
+      } else {
+        displayDayInCycle = (currentStreak % 7) + 1;
+      }
+    }
+
+    const todayReward = this.DAILY_STREAK_REWARDS[displayDayInCycle - 1] || this.DAILY_STREAK_REWARDS[0];
+    const streakMultiplier = Number((1 + (displayDayInCycle - 1) * 0.15).toFixed(1));
+
+    const now = new Date();
+    const tomorrowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime();
+    const msUntilNextDrop = Math.max(0, tomorrowMidnight - now.getTime());
+
+    return {
+      canClaim,
+      currentStreak,
+      displayDayInCycle,
+      isBroken,
+      longestStreak,
+      msUntilNextDrop,
+      todayReward,
+      streakMultiplier,
+    };
+  }
+
+  public static claimDailyStreak(profile: UserProfile): {
+    success: boolean;
+    coinsClaimed: number;
+    livesClaimed: number;
+    newStreak: number;
+    reward: DailyStreakReward;
+    profile: UserProfile;
+  } {
+    const status = this.getStreakStatus(profile);
+    if (!status.canClaim) {
+      return {
+        success: false,
+        coinsClaimed: 0,
+        livesClaimed: 0,
+        newStreak: status.currentStreak,
+        reward: status.todayReward,
+        profile,
+      };
+    }
+
+    let newStreak: number;
+    if (status.isBroken || profile.lastDailyBoxClaim === 0) {
+      newStreak = 1;
+    } else {
+      newStreak = (profile.streakDays || 0) + 1;
+    }
+
+    const reward = status.todayReward;
+    const bonusCoins = reward.coins;
+    const bonusLives = reward.lives;
+
+    const tx = this.transactCoins(
+      'EARN',
+      bonusCoins,
+      `Daily Login Streak Day ${status.displayDayInCycle} (${reward.perkTitle})`,
+      profile
+    );
+    const updated = { ...tx.profile };
+
+    updated.streakDays = newStreak;
+    updated.longestStreak = Math.max(updated.longestStreak || 1, newStreak);
+    updated.lastDailyBoxClaim = Date.now();
+    updated.lives = Math.min(updated.maxLives, updated.lives + bonusLives);
+
+    this.saveProfile(updated);
+
+    return {
+      success: true,
+      coinsClaimed: bonusCoins,
+      livesClaimed: bonusLives,
+      newStreak,
+      reward,
+      profile: updated,
+    };
+  }
+
   // Check if daily box is ready
   public static canClaimDailyBox(profile: UserProfile): boolean {
-    const now = new Date();
-    const lastClaim = new Date(profile.lastDailyBoxClaim);
-    // If not claimed today
-    return (
-      profile.lastDailyBoxClaim === 0 ||
-      now.getDate() !== lastClaim.getDate() ||
-      now.getMonth() !== lastClaim.getMonth() ||
-      now.getFullYear() !== lastClaim.getFullYear()
-    );
+    return this.getStreakStatus(profile).canClaim;
+  }
+
+  // --- HOURLY COIN STASH / REWARD VAULT (User Engagement Alert Feature) ---
+  public static readonly COIN_STASH_INTERVAL_MS = 2 * 60 * 60 * 1000; // 2 hours
+  public static readonly COIN_STASH_AMOUNT = 100;
+
+  public static canClaimCoinStash(profile: UserProfile): boolean {
+    if (!profile.lastCoinStashClaim || profile.lastCoinStashClaim === 0) return true;
+    return Date.now() - profile.lastCoinStashClaim >= this.COIN_STASH_INTERVAL_MS;
+  }
+
+  public static getNextCoinStashTime(profile: UserProfile): number {
+    if (!profile.lastCoinStashClaim || profile.lastCoinStashClaim === 0) return Date.now();
+    return profile.lastCoinStashClaim + this.COIN_STASH_INTERVAL_MS;
+  }
+
+  public static claimCoinStash(profile: UserProfile, bonusAmount: number = 100): { success: boolean; coinsClaimed: number; profile: UserProfile } {
+    if (!this.canClaimCoinStash(profile)) {
+      return { success: false, coinsClaimed: 0, profile };
+    }
+
+    const tx = this.transactCoins('EARN', bonusAmount, 'Hourly Free Coin Drop', profile);
+    tx.profile.lastCoinStashClaim = Date.now();
+    this.saveProfile(tx.profile);
+    return { success: true, coinsClaimed: bonusAmount, profile: tx.profile };
   }
 
   // Generate realistic leaderboard entries for any game

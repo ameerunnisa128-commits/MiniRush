@@ -133,6 +133,35 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               }`} />
             </button>
           </div>
+
+          {/* Coin Vault Drop Reminder Alert */}
+          <div className="flex items-center justify-between p-3.5 bg-slate-800/80 rounded-2xl border border-slate-700">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-yellow-500/20 text-yellow-400 flex items-center justify-center text-lg">
+                🪙
+              </div>
+              <div>
+                <span className="text-sm font-bold text-white block">Coin Drop Alerts</span>
+                <span className="text-[11px] text-slate-400">Remind to claim +100 free coins</span>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                const current = profile.coinReminderEnabled ?? true;
+                const updated = { ...profile, coinReminderEnabled: !current };
+                StorageService.saveProfile(updated);
+                onProfileUpdate(updated);
+                sound.playTick();
+              }}
+              className={`w-12 h-6 rounded-full p-0.5 transition-colors ${
+                (profile.coinReminderEnabled ?? true) ? 'bg-amber-500' : 'bg-slate-700'
+              }`}
+            >
+              <div className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                (profile.coinReminderEnabled ?? true) ? 'translate-x-6' : 'translate-x-0'
+              }`} />
+            </button>
+          </div>
         </div>
 
         {/* Reset Data */}

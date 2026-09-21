@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import { GameDefinition, UserProfile, GameCategory } from '../types';
 import { getDailyChallengeGame } from '../data/games';
 import { sound } from '../services/sound';
-import { Sparkles, Play, Trophy, Flame, Zap, Compass, Filter } from 'lucide-react';
+import { Sparkles, Play, Trophy, Flame, Zap, Compass, Filter, Gauge } from 'lucide-react';
+import { CoinStashCard } from './CoinStashCard';
+import { DailyStreakCard } from './DailyStreakCard';
 
 interface HomeTabProps {
   games: GameDefinition[];
@@ -10,6 +12,7 @@ interface HomeTabProps {
   onSelectGame: (game: GameDefinition) => void;
   onOpenDailyBox: () => void;
   canClaimDailyBox: boolean;
+  onProfileUpdate: (profile: UserProfile) => void;
 }
 
 const CATEGORIES: { id: string; label: string; icon: string }[] = [
@@ -27,6 +30,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
   onSelectGame,
   onOpenDailyBox,
   canClaimDailyBox,
+  onProfileUpdate,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const dailyGame = getDailyChallengeGame(games);
@@ -45,24 +49,59 @@ export const HomeTab: React.FC<HomeTabProps> = ({
 
   return (
     <div className="flex flex-col gap-5 pb-20">
-      {/* Daily Mystery Box Notification Banner */}
-      {canClaimDailyBox && (
-        <div 
-          onClick={onOpenDailyBox}
-          className="cursor-pointer mx-1 p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/20 via-yellow-500/20 to-orange-500/20 border border-amber-500/40 flex items-center justify-between shadow-lg active:scale-[0.98] transition-transform animate-pulse"
-        >
-          <div className="flex items-center gap-3">
-            <span className="text-3xl">🎁</span>
-            <div>
-              <h4 className="text-xs font-black text-amber-300 uppercase tracking-wider">Daily Box Ready!</h4>
-              <p className="text-[11px] text-slate-300">Tap to claim free coins & lives for today</p>
+      {/* Daily Login Streak & Bonus Coins Progression Feature */}
+      <DailyStreakCard
+        profile={profile}
+        onProfileUpdate={onProfileUpdate}
+        onOpenMysteryBox={onOpenDailyBox}
+      />
+
+      {/* Arcade Coin Vault / Hourly Stash Card with Notification Reminders */}
+      <CoinStashCard profile={profile} onProfileUpdate={onProfileUpdate} />
+
+      {/* Drift King Spotlight Banner */}
+      {(() => {
+        const driftGame = games.find(g => g.id === 'drift-king');
+        if (!driftGame) return null;
+        const longestDrift = profile.longestDrift || 0;
+        return (
+          <div
+            onClick={() => {
+              sound.playClick();
+              onSelectGame(driftGame);
+            }}
+            className="cursor-pointer relative overflow-hidden rounded-3xl bg-gradient-to-r from-cyan-950 via-slate-900 to-rose-950 border-2 border-cyan-500/50 p-4 shadow-xl active:scale-[0.98] transition-transform"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-3xl shadow-lg">
+                  🏎️
+                </div>
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-black uppercase tracking-wider bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded-full border border-cyan-500/30">
+                      NEW GAME
+                    </span>
+                    <span className="text-[10px] font-bold text-rose-400 flex items-center gap-0.5">
+                      <Flame className="w-3 h-3 fill-rose-500" /> LEADERBOARD STANDING
+                    </span>
+                  </div>
+                  <h3 className="font-display font-black text-base text-white tracking-wide mt-0.5">
+                    Drift King
+                  </h3>
+                  <p className="text-[11px] text-slate-300">
+                    Touch & hold to slide! Longest Drift: <span className="text-cyan-400 font-bold font-mono">{longestDrift > 0 ? `${longestDrift.toFixed(1)}m` : 'Unranked'}</span>
+                  </p>
+                </div>
+              </div>
+
+              <span className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 text-white font-black text-xs shadow-md shrink-0 flex items-center gap-1">
+                DRIFT 🏎️
+              </span>
             </div>
           </div>
-          <span className="text-xs font-black text-amber-400 bg-amber-500/20 px-2.5 py-1 rounded-xl border border-amber-500/30">
-            CLAIM
-          </span>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Featured Game of the Day Hero Banner */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-900 via-purple-950 to-slate-950 border-2 border-indigo-500/40 p-5 shadow-2xl">

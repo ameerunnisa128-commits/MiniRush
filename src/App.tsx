@@ -19,6 +19,8 @@ import { ShareModal } from './components/ShareModal';
 import { AdModal } from './components/AdModal';
 import { SettingsModal } from './components/SettingsModal';
 import { SplashScreen } from './components/SplashScreen';
+import { CoinReminderBanner } from './components/CoinReminderBanner';
+import { notificationService } from './services/notificationService';
 
 import { Heart, Coins, Settings, Gamepad2, Swords, Trophy, User, Plus } from 'lucide-react';
 
@@ -38,6 +40,7 @@ export default function App() {
   const [friendChallengeGame, setFriendChallengeGame] = useState<{ game?: GameDefinition; score?: number } | null>(null);
   const [shareData, setShareData] = useState<{ game: GameDefinition; score: number } | null>(null);
   const [adReason, setAdReason] = useState<RewardedAdReason | null>(null);
+  const [showCoinReminderBanner, setShowCoinReminderBanner] = useState(false);
 
   // Sync sound settings
   useEffect(() => {
@@ -52,6 +55,38 @@ export default function App() {
     }, 15000);
     return () => clearInterval(timer);
   }, []);
+
+  // Check for coin stash reminder every 25 seconds
+  useEffect(() => {
+    const checkCoinStash = () => {
+      const current = StorageService.loadProfile();
+      const canClaim = StorageService.canClaimCoinStash(current);
+      const reminderOn = current.coinReminderEnabled ?? true;
+
+      if (canClaim && reminderOn) {
+        setShowCoinReminderBanner(true);
+        notificationService.triggerCoinReminderAlert();
+      }
+    };
+
+    // Check after brief delay upon opening app
+    const initialTimer = setTimeout(checkCoinStash, 3000);
+    const intervalTimer = setInterval(checkCoinStash, 30000);
+    return () => {
+      clearTimeout(initialTimer);
+      clearInterval(intervalTimer);
+    };
+  }, []);
+
+  // Claim coins directly from reminder banner
+  const handleClaimCoinFromBanner = () => {
+    const res = StorageService.claimCoinStash(profile, 100);
+    if (res.success) {
+      sound.playCoinCascade();
+      setProfile(res.profile);
+    }
+    setShowCoinReminderBanner(false);
+  };
 
   // Hash URL listener for instant challenge matches
   useEffect(() => {
@@ -197,6 +232,7 @@ export default function App() {
                 setIsDailyBoxOpen(true);
               }}
               canClaimDailyBox={canClaimDaily}
+              onProfileUpdate={setProfile}
             />
           )}
 
@@ -210,7 +246,13 @@ export default function App() {
           )}
 
           {activeTab === 'leaderboard' && (
-            <LeaderboardTab profile={profile} />
+            <LeaderboardTab
+              profile={profile}
+              onPlayGame={(gameId) => {
+                const g = GAME_CATALOG.find((x) => x.id === gameId);
+                if (g) handleLaunchGame(g);
+              }}
+            />
           )}
 
           {activeTab === 'profile' && (
@@ -350,6 +392,14 @@ export default function App() {
             onClose={() => setIsSettingsOpen(false)}
             onSettingsUpdate={setSettings}
             onProfileUpdate={setProfile}
+          />
+        )}
+
+        {/* Global Coin Drop In-App Alert Reminder Banner */}
+        {showCoinReminderBanner && (
+          <CoinReminderBanner
+            onClaim={handleClaimCoinFromBanner}
+            onDismiss={() => setShowCoinReminderBanner(false)}
           />
         )}
 

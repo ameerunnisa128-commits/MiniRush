@@ -6,14 +6,14 @@ import { sound } from '../services/sound';
 import { ArrowLockGame } from '../games/ArrowLock';
 import { KnifeThrowGame } from '../games/KnifeThrow';
 import { PerfectAimGame } from '../games/PerfectAim';
-import { PerfectParkGame } from '../games/PerfectPark';
+import { DriftKingGame } from '../games/DriftKing';
 import { Mini2048Game } from '../games/Mini2048';
 import { DualShootGame } from '../games/DualShoot';
 import { QuickReactionGame } from '../games/QuickReaction';
 import { PerfectStackGame } from '../games/PerfectStack';
 import { DontTapRedGame } from '../games/DontTapRed';
 import { OneShotGame } from '../games/OneShot';
-import { X, RotateCcw, Play, Share2, Users, Home, Award, Heart, Coins } from 'lucide-react';
+import { X, RotateCcw, Play, Share2, Users, Home, Award, Heart, Coins, Maximize2, Minimize2 } from 'lucide-react';
 
 interface ActiveGameModalProps {
   game: GameDefinition;
@@ -46,6 +46,32 @@ export const ActiveGameModal: React.FC<ActiveGameModalProps> = ({
   const [coinsEarned, setCoinsEarned] = useState(0);
   const [gameKey, setGameKey] = useState(1); // key to instantly restart game component
   const [outOfLives, setOutOfLives] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const handleFsChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFsChange);
+    return () => document.removeEventListener('fullscreenchange', handleFsChange);
+  }, []);
+
+  const toggleFullscreen = async () => {
+    sound.playClick();
+    try {
+      if (!document.fullscreenElement) {
+        if (document.documentElement.requestFullscreen) {
+          await document.documentElement.requestFullscreen();
+        }
+      } else {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        }
+      }
+    } catch {
+      // Fullscreen cancelled
+    }
+  };
 
   // Consume 1 life on start
   useEffect(() => {
@@ -116,8 +142,8 @@ export const ActiveGameModal: React.FC<ActiveGameModalProps> = ({
         return <KnifeThrowGame key={gameKey} onGameOver={handleGameOver} onExit={onClose} />;
       case 'perfect-aim':
         return <PerfectAimGame key={gameKey} onGameOver={handleGameOver} onExit={onClose} />;
-      case 'perfect-park':
-        return <PerfectParkGame key={gameKey} onGameOver={handleGameOver} onExit={onClose} />;
+      case 'drift-king':
+        return <DriftKingGame key={gameKey} onGameOver={handleGameOver} onExit={onClose} />;
       case 'mini-2048':
         return <Mini2048Game key={gameKey} onGameOver={handleGameOver} onExit={onClose} />;
       case 'dual-shoot':
@@ -152,26 +178,44 @@ export const ActiveGameModal: React.FC<ActiveGameModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex flex-col items-center justify-center p-2 sm:p-4 animate-in fade-in duration-150">
-      {/* Container Frame */}
-      <div className="relative w-full max-w-md h-[94vh] bg-slate-900 border-2 border-slate-800 rounded-3xl shadow-2xl flex flex-col overflow-hidden">
+    <div className={`fixed inset-0 z-50 bg-slate-950 flex flex-col ${isFullscreen ? 'p-0' : 'sm:items-center sm:justify-center sm:p-2 sm:py-3'} animate-in fade-in duration-150`}>
+      {/* Container Frame - 100% full screen on mobile & fullscreen mode, elegant frame on desktop */}
+      <div className={`relative w-full h-[100dvh] ${
+        isFullscreen
+          ? 'sm:max-w-none sm:h-full sm:rounded-none sm:border-0'
+          : 'sm:max-w-md sm:h-[96vh] sm:border-2 sm:border-slate-800 sm:rounded-3xl'
+      } bg-slate-900 shadow-2xl flex flex-col overflow-hidden`}>
         
         {/* Top Header Bar */}
-        <div className="flex items-center justify-between px-4 py-3 bg-slate-900/90 border-b border-slate-800">
+        <div className="flex items-center justify-between px-3 sm:px-4 py-2 sm:py-2.5 bg-slate-900/95 border-b border-slate-800 shrink-0 z-20">
           <div className="flex items-center gap-2">
             <span className="text-2xl">{game.icon}</span>
             <div>
-              <h2 className="font-display font-black text-base text-white tracking-wide">{game.name}</h2>
-              <span className="text-[11px] font-semibold text-slate-400 uppercase">{game.category} • {game.difficulty}</span>
+              <h2 className="font-display font-black text-sm sm:text-base text-white tracking-wide">{game.name}</h2>
+              <span className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase">{game.category} • {game.difficulty}</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-2.5">
             {/* Lives indicator */}
-            <div className="flex items-center gap-1 bg-slate-800/80 px-2.5 py-1 rounded-full border border-slate-700">
+            <div className="flex items-center gap-1 bg-slate-800/80 px-2 py-1 rounded-full border border-slate-700">
               <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500" />
               <span className="text-xs font-bold text-slate-200">{profile.lives}</span>
             </div>
+
+            {/* Fullscreen Toggle button */}
+            <button
+              onClick={toggleFullscreen}
+              title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+              className={`px-2.5 py-1 rounded-xl border text-xs font-bold transition-all flex items-center gap-1 active:scale-95 ${
+                isFullscreen
+                  ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-300'
+                  : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-700'
+              }`}
+            >
+              {isFullscreen ? <Minimize2 className="w-3.5 h-3.5 text-cyan-400" /> : <Maximize2 className="w-3.5 h-3.5" />}
+              <span className="text-[10px] font-extrabold">{isFullscreen ? 'EXIT' : 'EXPAND'}</span>
+            </button>
 
             {/* Exit button */}
             <button

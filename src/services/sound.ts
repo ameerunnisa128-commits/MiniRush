@@ -427,6 +427,166 @@ class SoundService {
       this.isMusicPlaying = false;
     }
   }
+
+  // --- DRIFT CAR SOUND EFFECTS ---
+  private driftNoiseSource: AudioBufferSourceNode | null = null;
+  private driftGain: GainNode | null = null;
+  private driftFilter: BiquadFilterNode | null = null;
+
+  public startContinuousDriftScreech() {
+    if (!this.soundEnabled) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+    if (this.driftGain) return; // already active
+
+    try {
+      // 2 seconds looping tire friction noise
+      const bufferSize = ctx.sampleRate * 2;
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * 0.5;
+      }
+
+      this.driftNoiseSource = ctx.createBufferSource();
+      this.driftNoiseSource.buffer = buffer;
+      this.driftNoiseSource.loop = true;
+
+      this.driftFilter = ctx.createBiquadFilter();
+      this.driftFilter.type = 'bandpass';
+      this.driftFilter.frequency.setValueAtTime(1400, ctx.currentTime);
+      this.driftFilter.Q.setValueAtTime(4.5, ctx.currentTime);
+
+      this.driftGain = ctx.createGain();
+      this.driftGain.gain.setValueAtTime(0.01, ctx.currentTime);
+      this.driftGain.gain.linearRampToValueAtTime(0.28, ctx.currentTime + 0.08);
+
+      this.driftNoiseSource.connect(this.driftFilter);
+      this.driftFilter.connect(this.driftGain);
+      this.driftGain.connect(ctx.destination);
+
+      this.driftNoiseSource.start();
+      this.vibrate([15, 20]);
+    } catch {
+      this.driftGain = null;
+    }
+  }
+
+  public updateDriftPitch(intensity: number = 1) {
+    if (!this.driftFilter || !this.ctx) return;
+    const freq = Math.min(2800, 1200 + intensity * 350);
+    this.driftFilter.frequency.setTargetAtTime(freq, this.ctx.currentTime, 0.05);
+  }
+
+  public stopContinuousDriftScreech() {
+    if (!this.driftGain || !this.ctx) return;
+    try {
+      this.driftGain.gain.linearRampToValueAtTime(0.001, this.ctx.currentTime + 0.08);
+      setTimeout(() => {
+        if (this.driftNoiseSource) {
+          try { this.driftNoiseSource.stop(); } catch { /* ignore */ }
+          this.driftNoiseSource.disconnect();
+          this.driftNoiseSource = null;
+        }
+        if (this.driftFilter) {
+          this.driftFilter.disconnect();
+          this.driftFilter = null;
+        }
+        if (this.driftGain) {
+          this.driftGain.disconnect();
+          this.driftGain = null;
+        }
+      }, 100);
+    } catch {
+      this.driftGain = null;
+    }
+  }
+
+  public playTurboBlowoff() {
+    if (!this.soundEnabled) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    try {
+      // Turbo flutter hiss
+      const bufferSize = ctx.sampleRate * 0.22;
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        // Amplitude flutter envelope
+        const flutter = Math.sin((i / bufferSize) * Math.PI * 18);
+        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.35)) * (0.6 + 0.4 * flutter);
+      }
+
+      const noise = ctx.createBufferSource();
+      noise.buffer = buffer;
+
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'highpass';
+      filter.frequency.setValueAtTime(2200, ctx.currentTime);
+      filter.frequency.exponentialRampToValueAtTime(1400, ctx.currentTime + 0.2);
+
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.35, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.22);
+
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+
+      noise.start();
+      this.vibrate([10, 30, 10]);
+    } catch {
+      // ignore
+    }
+  }
+
+  public playDriftMilestone(multiplier: number = 2) {
+    if (!this.soundEnabled) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    // Ascending high-energy chords
+    const chord = [440 * (multiplier > 3 ? 1.5 : 1.25), 554.37, 659.25, 880];
+    chord.forEach((f, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(f, ctx.currentTime + idx * 0.03);
+
+      gain.gain.setValueAtTime(0.2, ctx.currentTime + idx * 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.03 + 0.25);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + idx * 0.03);
+      osc.stop(ctx.currentTime + idx * 0.03 + 0.28);
+    });
+    this.vibrate([30, 20, 40]);
+  }
+
+  public playCoinCascade() {
+    if (!this.soundEnabled) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    const pitches = [987.77, 1174.66, 1318.51, 1567.98, 1760.00, 2093.00];
+    pitches.forEach((f, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(f, ctx.currentTime + idx * 0.06);
+
+      gain.gain.setValueAtTime(0.2, ctx.currentTime + idx * 0.06);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.06 + 0.22);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + idx * 0.06);
+      osc.stop(ctx.currentTime + idx * 0.06 + 0.25);
+    });
+    this.vibrate([15, 20, 25, 30]);
+  }
 }
 
 export const sound = new SoundService();

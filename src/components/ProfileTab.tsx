@@ -243,8 +243,11 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ profile, onProfileUpdate
           </div>
 
           <div className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800">
-            <span className="text-[11px] font-bold text-slate-400 block uppercase">Win Streak</span>
-            <span className="text-2xl font-black font-display text-pink-400">{profile.streakDays} Days</span>
+            <span className="text-[11px] font-bold text-slate-400 block uppercase">Daily Streak</span>
+            <div className="flex items-baseline justify-between">
+              <span className="text-2xl font-black font-display text-amber-400">{profile.streakDays} Days</span>
+              <span className="text-[10px] font-mono font-bold text-slate-400">Best: {profile.longestStreak || profile.streakDays}d</span>
+            </div>
           </div>
         </div>
       </div>

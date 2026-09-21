@@ -12,33 +12,26 @@ interface DailyBoxModalProps {
   onRequestAdToDouble: (bonusCoins: number) => void;
 }
 
-const STREAK_REWARDS = [
-  { day: 1, coins: 150, lives: 1 },
-  { day: 2, coins: 250, lives: 2 },
-  { day: 3, coins: 400, lives: 2 },
-  { day: 4, coins: 550, lives: 3 },
-  { day: 5, coins: 700, lives: 3 },
-  { day: 6, coins: 900, lives: 4 },
-  { day: 7, coins: 1500, lives: 5, mega: true },
-];
-
 export const DailyBoxModal: React.FC<DailyBoxModalProps> = ({
   profile,
   onClose,
   onProfileUpdate,
   onRequestAdToDouble,
 }) => {
-  const canClaim = StorageService.canClaimDailyBox(profile);
+  const streakStatus = StorageService.getStreakStatus(profile);
+  const canClaim = streakStatus.canClaim;
   const [isOpened, setIsOpened] = useState(!canClaim);
   const [claimedReward, setClaimedReward] = useState<{ coins: number; lives: number } | null>(null);
 
-  const currentStreak = ((profile.streakDays - 1) % 7) + 1;
-  const rewardToday = STREAK_REWARDS[currentStreak - 1];
+  const streakRewards = StorageService.DAILY_STREAK_REWARDS;
+  const currentStreak = streakStatus.displayDayInCycle;
+  const rewardToday = streakStatus.todayReward;
 
   const handleOpenBox = () => {
     if (!canClaim || isOpened) return;
 
     sound.playVictory();
+    sound.playCoinCascade();
     try {
       confetti({
         particleCount: 100,
@@ -49,17 +42,12 @@ export const DailyBoxModal: React.FC<DailyBoxModalProps> = ({
       // ignore
     }
 
-    const tx = StorageService.transactCoins('EARN', rewardToday.coins, `Daily Box Day ${currentStreak}`, profile);
-    const updated = { ...tx.profile };
-    updated.lives = Math.min(updated.maxLives, updated.lives + rewardToday.lives);
-    updated.lastDailyBoxClaim = Date.now();
-    updated.streakDays += 1;
-
-    StorageService.saveProfile(updated);
-    onProfileUpdate(updated);
-
-    setClaimedReward({ coins: rewardToday.coins, lives: rewardToday.lives });
-    setIsOpened(true);
+    const res = StorageService.claimDailyStreak(profile);
+    if (res.success) {
+      onProfileUpdate(res.profile);
+      setClaimedReward({ coins: res.coinsClaimed, lives: res.livesClaimed });
+      setIsOpened(true);
+    }
   };
 
   const alreadyDoubledToday = profile.lastDailyBoxDoubled && 
@@ -86,7 +74,7 @@ export const DailyBoxModal: React.FC<DailyBoxModalProps> = ({
 
         {/* 7-Day Streak Calendar */}
         <div className="grid grid-cols-7 gap-1.5 my-5">
-          {STREAK_REWARDS.map((r) => {
+          {streakRewards.map((r) => {
             const isPast = r.day < currentStreak;
             const isToday = r.day === currentStreak;
             return (
@@ -101,7 +89,7 @@ export const DailyBoxModal: React.FC<DailyBoxModalProps> = ({
                 }`}
               >
                 <span>D{r.day}</span>
-                <span className="text-sm my-0.5">{r.mega ? '👑' : '🎁'}</span>
+                <span className="text-sm my-0.5">{r.isMega ? '👑' : '🎁'}</span>
                 <span>+{r.coins}</span>
               </div>
             );

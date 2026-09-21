@@ -76,6 +76,7 @@ export interface LeaderboardEntry {
   username?: string;
   avatar: string;
   score: number;
+  longestDrift?: number;
   country?: string;
   badge?: string;
   isCurrentUser?: boolean;
@@ -121,6 +122,7 @@ export interface UserProfile {
   maxLives: number;
   nextLifeRefillTime: number; // timestamp
   streakDays: number;
+  longestStreak?: number;
   lastDailyBoxClaim: number; // timestamp
   lastDailyBoxDoubled?: number; // timestamp
   referralCode: string;
@@ -134,6 +136,9 @@ export interface UserProfile {
   unlockedAvatars: string[];
   achievements: Achievement[];
   coinTransactions?: CoinTransaction[];
+  longestDrift?: number; // Longest continuous drift distance in meters
+  lastCoinStashClaim?: number; // timestamp of hourly/stash coin reward
+  coinReminderEnabled?: boolean; // alert notification reminder toggle
 }
 
 export interface AppSettings {
@@ -141,6 +146,17 @@ export interface AppSettings {
   musicEnabled: boolean;
   hapticsEnabled: boolean;
   reducedMotion: boolean;
+  coinReminderEnabled?: boolean;
+  fullscreenGameplay?: boolean;
 }
 
 export type MainTab = 'home' | 'games' | 'challenge' | 'leaderboard' | 'profile';
+
+export interface DailyStreakReward {
+  day: number;
+  coins: number;
+  lives: number;
+  perkTitle: string;
+  badge: string;
+  isMega?: boolean;
+}
